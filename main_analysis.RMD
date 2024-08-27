@@ -1,0 +1,163 @@
+Purpose: Code to reproduce figures and analysis as presented in CH et al.
+
+# Import necessary libraries
+library(Seurat)
+library(dplyr)
+library(ggplot2)
+library(voxhunt)
+
+# Read in data
+so.1.data <- Read10X("/data/lippmann_lab/11832-CH/11832-CH-1_S1_L005_results/filtered_matrix/sensitivity_5")
+so.1 <- CreateSeuratObject(counts = so.1.data, min.cells = 3, min.features = 200)
+so.1$orig.ident <- 'SAMPLE 1'
+rm(so.1.data)
+
+so.2.data <- Read10X("/data/lippmann_lab/11832-CH/11832-CH-2_S1_L005_results/filtered_matrix/sensitivity_5")
+so.2 <- CreateSeuratObject(counts = so.2.data, min.cells = 3, min.features = 200)
+so.2$orig.ident <- 'SAMPLE 2'
+rm(so.2.data)
+
+so.3.data <- Read10X("/data/lippmann_lab/11832-CH/11832-CH-3_S1_L005_results/filtered_matrix/sensitivity_5")
+so.3 <- CreateSeuratObject(counts = so.3.data, min.cells = 3, min.features = 200)
+so.3$orig.ident <- 'SAMPLE 3'
+rm(so.3.data)
+
+
+### SEURAT ANALYSIS
+so.1.clean <- subset(so.1, nFeature_RNA > 1600 & nFeature_RNA < 7500)
+so.2.clean <- subset(so.2, nFeature_RNA > 1600 & nFeature_RNA < 7500)
+so.3.clean <- subset(so.3, nFeature_RNA > 1600 & nFeature_RNA < 7500)
+
+# Merge datasets
+so.combined <- merge(so.1.clean, y = c(so.2.clean, so.3.clean))
+
+# Process data, do dimension reduction
+so.combined <- NormalizeData(so.combined)
+so.combined <- FindVariableFeatures(so.combined, selection.method = "vst", nfeatures = 2000)
+so.combined <- ScaleData(so.combined, verbose = FALSE)
+so.combined <- RunPCA(so.combined, npcs = 50, verbose = FALSE)
+so.combined <- RunUMAP(so.combined, reduction = "pca", dims = 1:50)
+so.combined <- FindNeighbors(so.combined, reduction = "pca", dims = 1:50)
+so.combined <- FindClusters(so.combined, resolution = 0.10)
+
+# A list of cell cycle markers, from Tirosh et al, 2015, is loaded with Seurat.  We can
+# segregate this list into markers of G2/M phase and markers of S phase
+s.genes <- cc.genes$s.genes
+g2m.genes <- cc.genes$g2m.genes
+
+# Regress for cell cycle, then process
+so.combined.cc <- CellCycleScoring(so.combined, s.features = s.genes, g2m.features = g2m.genes, set.ident = TRUE)
+so.combined.cc <- ScaleData(so.combined.cc, vars.to.regress = c("S.Score", "G2M.Score"), features = rownames(so.combined.cc))
+so.combined.cc <- RunPCA(so.combined.cc, features = VariableFeatures(so.combined.cc))
+so.combined.cc <- RunUMAP(so.combined.cc, reduction = "pca", dims = 1:50)
+so.combined.cc <- FindNeighbors(so.combined.cc, reduction = "pca", dims = 1:50)
+so.combined.cc <- FindClusters(so.combined.cc, resolution = 1)
+
+# Filter out low quality cluster, and lower transcript cells
+so.subset <- subset(so.combined.cc, nCount_RNA > 10000 & seurat_clusters %in% c(0,1,2,3,4,5,6,8,9))
+
+so.subset <- RunUMAP(so.subset, reduction = "pca", dims = 1:50)
+so.subset <- FindNeighbors(so.subset, reduction = "pca", dims = 1:50)
+so.subset <- FindClusters(so.subset, resolution = 1)
+
+# Annotate cells
+so.subset$cell_type <- so.subset$RNA_snn_res.1
+so.subset$cell_type <- recode(so.subset$cell_type,
+                                      "0" = "Dorsal forebrain progenitors",
+                                     "1" = "Dorsal forebrain progenitors",
+                                     "2" = "Ventral tuberal hypothalamic progenitors",
+                                     "3" = "Dorsal forebrain progenitors",
+                                     "4" = "Floor plate",
+                                     "5" = "Floor plate",
+                                     "6" = "Unknown",
+                                     "7" = "Dorsal forebrain progenitors")
+
+# Calculate DEGs for Floor plate cells
+Idents(so.subset) <- so.subset$orig.ident
+Floor_plate_DEGs <- FindMarkers(subset(so.subset, cell_type == 'Floor plate'), ident.1 = 'SAMPLE 1', ident.2 = 'SAMPLE 3')
+
+# Calculate DEGs for G1 Floor plate cells
+Floor_plate_DEGs_G1 <- FindMarkers(subset(so.subset, cell_type == 'Floor plate' & Phase == 'G1'), ident.1 = 'SAMPLE 1', ident.2 = 'SAMPLE 3')
+
+# Visualization and figure reproduction
+pdf("2024.08.16_QC_metrics.pdf", width = 6, height = 3)
+VlnPlot(so.subset, features = c('nCount_RNA','nFeature_RNA'), group.by = 'orig.ident')
+
+pdf("2024.08.16_DimPlot_cell_phase.pdf", width = 8, height = 5)
+DimPlot(so.subset, group.by = 'Phase')
+
+pdf("2024.08.16_DimPlot_cell_type.pdf", width = 8, height = 5)
+DimPlot(so.subset, group.by = 'cell_type', cols = c('goldenrod2','orchid','darkturquoise','gray'))
+
+pdf("2024.08.16_DimPlot_cell_type_split.pdf", width = 15, height = 5)
+DimPlot(so.subset, group.by = 'cell_type', cols = c('goldenrod2','orchid','darkturquoise','gray'), split.by = 'orig.ident')
+
+pdf("2024.08.16_DimPlot_cell_type_split_and_markers.pdf", width = 10, height = 12)
+FeaturePlot(so.subset, features = c('PAX6','SOX2','NES','FOXA2','GATA4'), split.by = 'orig.ident', order = T)
+FeaturePlot(so.subset, features = c('CD34','NKX2-1','NKX2-2','NKX6-1','OLIG2'), split.by = 'orig.ident', order = T)
+FeaturePlot(so.subset, features = c('DBX2','PAX6','IRX3','DBX1','PAX7'), split.by = 'orig.ident', order = T)
+FeaturePlot(so.subset, features = c('FOXA2','GLI1','GLI2','PTCH1','SMO'), split.by = 'orig.ident', order = T)
+
+pdf("2024.08.16_DotPlot_major_markers.pdf", width = 8, height = 4)
+DotPlot(so.subset, features = c('PAX6','OTX2','EMX2','NKX2-1','RAX','SIX6','FOXA2','ARX'), group.by = 'cell_type') + theme(axis.text.x = element_text(angle = 90))
+
+pdf("2024.08.27_DimPlots.pdf", width = 4, height = 4.3)
+DimPlot(subset(so, orig.ident == 'SAMPLE 1'), group.by = 'cell_type', cols = c('goldenrod2','orchid','darkturquoise','gray')) + ggtitle('SAMPLE 1') + NoLegend() + xlim(c(-6,6)) + ylim(c(-6,6)) + theme(panel.border = element_rect(colour = "black", fill = NA, size = 1))
+DimPlot(subset(so, orig.ident == 'SAMPLE 2'), group.by = 'cell_type', cols = c('goldenrod2','orchid','gray')) + ggtitle('SAMPLE 2') + NoLegend() + xlim(c(-6,6)) + ylim(c(-6,6)) + theme(panel.border = element_rect(colour = "black", fill = NA, size = 1))
+DimPlot(subset(so, orig.ident == 'SAMPLE 3'), group.by = 'cell_type', cols = c('goldenrod2','orchid','darkturquoise','gray')) + ggtitle('SAMPLE 3') + NoLegend() + xlim(c(-6,6)) + ylim(c(-6,6)) + theme(panel.border = element_rect(colour = "black", fill = NA, size = 1))
+
+DimPlot(subset(so, orig.ident == 'SAMPLE 1'), group.by = 'Phase') + ggtitle('SAMPLE 1') + NoLegend() + xlim(c(-6,6)) + ylim(c(-6,6)) + theme(panel.border = element_rect(colour = "black", fill = NA, size = 1))
+DimPlot(subset(so, orig.ident == 'SAMPLE 2'), group.by = 'Phase') + ggtitle('SAMPLE 2') + NoLegend() + xlim(c(-6,6)) + ylim(c(-6,6)) + theme(panel.border = element_rect(colour = "black", fill = NA, size = 1))
+DimPlot(subset(so, orig.ident == 'SAMPLE 3'), group.by = 'Phase') + ggtitle('SAMPLE 3') + NoLegend() + xlim(c(-6,6)) + ylim(c(-6,6)) + theme(panel.border = element_rect(colour = "black", fill = NA, size = 1))
+
+pdf("2024.08.27_PooledDimPlots_cell_type.pdf", width = 6, height = 3)
+DimPlot(so, group.by = 'cell_type', cols = c('goldenrod2','orchid','darkturquoise','gray')) + ggtitle('ALL SAMPLES') +  xlim(c(-6,6)) + ylim(c(-6,6)) + theme(panel.border = element_rect(colour = "black", fill = NA, size = 1))
+
+pdf("2024.08.27_PooledDimPlots_phase.pdf")
+DimPlot(so, group.by = 'Phase') + ggtitle('ALL SAMPLES') +  xlim(c(-6,6)) + ylim(c(-6,6)) + theme(panel.border = element_rect(colour = "black", fill = NA, size = 1))
+
+# Print out cell numbers
+table(so.subset$orig.ident, so.subset$cell_type)
+
+# Save seurat object
+saveRDS(so.subset, "2024.08.16_CH_so.RDS")
+
+### VOX HUNT ANALYSIS
+# Read in BrainSpan Data using the VoxHunt library
+data('brainspan')
+names(brainspan)
+
+regional_markers <- structure_markers('E13') %>%
+    group_by(group) %>%
+    top_n(10, auc) %>% 
+    {unique(.$gene)}
+
+# Map Floor Plate cells to BrainSpan Atlas
+ref_map <- brainspan_map(
+    subset(so.subset, cell_type == 'Floor plate'),
+    stages = 10:24,
+    group_name = 'orig.ident',
+    genes_use = regional_markers,
+    pseudobulk_groups = T
+)
+
+pdf("2024.08.16_BrainSpan_floor_plate_correlation.pdf", width = 9, height = 4)
+plot_map(ref_map)
+
+pdf("2024.08.16_BrainSpan_floor_plate_correlation2.pdf", width = 3, height = 5)
+plot_structure_similarity(ref_map, annotation_level = 'structure_name', scale = F)
+
+# Map bulk cells to BrainSpan Atlas
+ref_map_bulk <- brainspan_map(
+    so.subset,
+    stages = 10:24,
+    group_name = 'orig.ident',
+    genes_use = regional_markers,
+    pseudobulk_groups = T
+)
+
+pdf("2024.08.16_BrainSpan_bulk_cells_correlation.pdf", width = 9, height = 4)
+plot_map(ref_map_bulk)
+
+pdf("2024.08.16_BrainSpan_bulk_cells_correlation2.pdf", width = 3, height = 5)
+plot_structure_similarity(ref_map_bulk, annotation_level = 'structure_name', scale = F)
