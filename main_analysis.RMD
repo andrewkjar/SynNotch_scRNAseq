@@ -4,186 +4,553 @@ Purpose: Code to reproduce figures and analysis as presented in CH et al.
 library(Seurat)
 library(dplyr)
 library(ggplot2)
-library(org.Hs.eg.db)
-library(clusterProfiler)
+library(ggprism)
 library(voxhunt)
+library(EnhancedVolcano)
+library(viridis)
+library(tidyr)
+library(pheatmap)
+library(DESeq2)
+library(ggforce)
 
 # Read in data
-so.1.data <- Read10X("/data/lippmann_lab/11832-CH/11832-CH-1_S1_L005_results/filtered_matrix/sensitivity_5")
+so.1.data <- Read10X("11832-CH-1_sensitivity_5")
 so.1 <- CreateSeuratObject(counts = so.1.data, min.cells = 3, min.features = 200)
-so.1$orig.ident <- 'SAMPLE 1'
+so.1$orig.ident <- 'SAMPLE 1 11832'
 rm(so.1.data)
 
-so.2.data <- Read10X("/data/lippmann_lab/11832-CH/11832-CH-2_S1_L005_results/filtered_matrix/sensitivity_5")
+so.2.data <- Read10X("11832-CH-2_sensitivity_5")
 so.2 <- CreateSeuratObject(counts = so.2.data, min.cells = 3, min.features = 200)
-so.2$orig.ident <- 'SAMPLE 2'
+so.2$orig.ident <- 'SAMPLE 2 11832'
 rm(so.2.data)
 
-so.3.data <- Read10X("/data/lippmann_lab/11832-CH/11832-CH-3_S1_L005_results/filtered_matrix/sensitivity_5")
+so.3.data <- Read10X("11832-CH-3_sensitivity_5")
 so.3 <- CreateSeuratObject(counts = so.3.data, min.cells = 3, min.features = 200)
-so.3$orig.ident <- 'SAMPLE 3'
+so.3$orig.ident <- 'SAMPLE 3 18832'
 rm(so.3.data)
+
+so.4.data <- Read10X("12540-CH-1_sensitivity_5")
+so.4 <- CreateSeuratObject(counts = so.4.data, min.cells = 3, min.features = 200)
+so.4$orig.ident <- 'SAMPLE 1 12540'
+rm(so.4.data)
+
+so.5.data <- Read10X("12540-CH-2_sensitivity_5")
+so.5 <- CreateSeuratObject(counts = so.5.data, min.cells = 3, min.features = 200)
+so.5$orig.ident <- 'SAMPLE 2 12540'
+rm(so.5.data)
+
+so.6.data <- Read10X("12540-CH-3_sensitivity_5")
+so.6 <- CreateSeuratObject(counts = so.6.data, min.cells = 3, min.features = 200)
+so.6$orig.ident <- 'SAMPLE 3 12540'
+rm(so.6.data)
+
+so.7.data <- Read10X("12540-CH-4_sensitivity_5")
+so.7 <- CreateSeuratObject(counts = so.7.data, min.cells = 3, min.features = 200)
+so.7$orig.ident <- 'SAMPLE 4 12540'
+rm(so.7.data)
+
+so.8.data <- Read10X("12540-CH-5_sensitivity_5")
+so.8 <- CreateSeuratObject(counts = so.8.data, min.cells = 3, min.features = 200)
+so.8$orig.ident <- 'SAMPLE 5 12540'
+rm(so.8.data)
+
+so.9.data <- Read10X("12540-CH-6_sensitivity_5")
+so.9 <- CreateSeuratObject(counts = so.9.data, min.cells = 3, min.features = 200)
+so.9$orig.ident <- 'SAMPLE 6 12540'
+rm(so.9.data)
 
 
 ### SEURAT ANALYSIS
 so.1.clean <- subset(so.1, nFeature_RNA > 1600 & nFeature_RNA < 7500)
 so.2.clean <- subset(so.2, nFeature_RNA > 1600 & nFeature_RNA < 7500)
 so.3.clean <- subset(so.3, nFeature_RNA > 1600 & nFeature_RNA < 7500)
+so.4.clean <- subset(so.4, nFeature_RNA > 1600 & nFeature_RNA < 7500)
+so.5.clean <- subset(so.5, nFeature_RNA > 1600 & nFeature_RNA < 7500)
+so.6.clean <- subset(so.6, nFeature_RNA > 1600 & nFeature_RNA < 7500)
+so.7.clean <- subset(so.7, nFeature_RNA > 1600 & nFeature_RNA < 7500)
+so.8.clean <- subset(so.8, nFeature_RNA > 1600 & nFeature_RNA < 7500)
+so.9.clean <- subset(so.9, nFeature_RNA > 1600 & nFeature_RNA < 7500)
 
 # Merge datasets
-so.combined <- merge(so.1.clean, y = c(so.2.clean, so.3.clean))
+so.final <- merge(so.1.clean, y = c(so.2.clean, so.3.clean, so.4.clean, so.5.clean, so.6.clean, so.7.clean, so.8.clean, so.9.clean))
+
+# Add metadata
+so.final$sample_type <- so.final$orig.ident
+so.final$sample_type <- recode(so.final$sample_type,
+                                    "SAMPLE 1 11832" = "WT H9s WITH SHH",
+                                    "SAMPLE 1 12540" = "WT H9s WITH SHH",
+                                    "SAMPLE 2 11832" = "SynNotch H9s + WT H9s",
+                                  "SAMPLE 2 12540" = "SynNotch H9s + WT H9s",
+                                  "SAMPLE 3 12540" = "SynNotch H9s + GFP Ligand",
+                                  "SAMPLE 3 18832" = "SynNotch H9s + GFP Ligand",
+                                  "SAMPLE 4 12540" = "WT H9s WITH SHH",
+                                  "SAMPLE 5 12540" = "SynNotch H9s + GFP Ligand",
+                                  "SAMPLE 6 12540" = "SynNotch H9s + WT H9s")
+
+so.final$plotting_ident <- so.final$orig.ident
+so.final$plotting_ident <- recode(so.final$plotting_ident,
+                                    "SAMPLE 1 11832" = "WT H9s WITH SHH 1",
+                                    "SAMPLE 1 12540" = "WT H9s WITH SHH 2",
+                                    "SAMPLE 2 11832" = "SynNotch H9s + WT H9s 1",
+                                  "SAMPLE 2 12540" = "SynNotch H9s + WT H9s 2",
+                                  "SAMPLE 3 12540" = "SynNotch H9s + GFP Ligand 1",
+                                  "SAMPLE 3 18832" = "SynNotch H9s + GFP Ligand 2",
+                                  "SAMPLE 4 12540" = "WT H9s WITH SHH 3",
+                                  "SAMPLE 5 12540" = "SynNotch H9s + GFP Ligand 3",
+                                  "SAMPLE 6 12540" = "SynNotch H9s + WT H9s 3")
 
 # Process data, do dimension reduction
-so.combined <- NormalizeData(so.combined)
-so.combined <- FindVariableFeatures(so.combined, selection.method = "vst", nfeatures = 2000)
-so.combined <- ScaleData(so.combined, verbose = FALSE)
-so.combined <- RunPCA(so.combined, npcs = 50, verbose = FALSE)
-so.combined <- RunUMAP(so.combined, reduction = "pca", dims = 1:50)
-so.combined <- FindNeighbors(so.combined, reduction = "pca", dims = 1:50)
-so.combined <- FindClusters(so.combined, resolution = 0.10)
+so.final <- NormalizeData(so.final)
+so.final <- FindVariableFeatures(so.final, selection.method = "vst", nfeatures = 2000)
+so.final <- ScaleData(so.final, verbose = FALSE)
+so.final <- RunPCA(so.final, npcs = 50, verbose = FALSE)
+so.final <- RunUMAP(so.final, reduction = "pca", dims = 1:50)
+so.final <- FindNeighbors(so.final, reduction = "pca", dims = 1:50)
+so.final <- FindClusters(so.final, resolution = 1.5)
 
-# A list of cell cycle markers, from Tirosh et al, 2015, is loaded with Seurat.  We can
-# segregate this list into markers of G2/M phase and markers of S phase
+# Filter out low quality clusters
+so.final <- subset(so.final, seurat_clusters %in% c(0,1,2,3,4,5,6,7,8,10,11,12,13,14,15,16,18,19,20))
+
+# Process data, do dimension reduction again
+so.final <- NormalizeData(so.final)
+so.final <- FindVariableFeatures(so.final, selection.method = "vst", nfeatures = 2000)
+so.final <- ScaleData(so.final, verbose = FALSE)
+so.final <- RunUMAP(so.final, reduction = "pca", dims = 1:50)
+so.final <- FindNeighbors(so.final, reduction = "pca", dims = 1:50)
+so.final <- FindClusters(so.final, resolution = 1.5)
+so.final <- JoinLayers(so.final)
+
+# Add floor plate score to cells
+fp_features <- list(c('FOXA2','FOXA1','ARX','TFF3'))
+so.final <- AddModuleScore(so.final, features = fp_features, name = 'floor_plate_score')
+
+# Score cells for phase
 s.genes <- cc.genes$s.genes
 g2m.genes <- cc.genes$g2m.genes
-
-# Regress for cell cycle, then process
-so.combined.cc <- CellCycleScoring(so.combined, s.features = s.genes, g2m.features = g2m.genes, set.ident = TRUE)
-so.combined.cc <- ScaleData(so.combined.cc, vars.to.regress = c("S.Score", "G2M.Score"), features = rownames(so.combined.cc))
-so.combined.cc <- RunPCA(so.combined.cc, features = VariableFeatures(so.combined.cc))
-so.combined.cc <- RunUMAP(so.combined.cc, reduction = "pca", dims = 1:50)
-so.combined.cc <- FindNeighbors(so.combined.cc, reduction = "pca", dims = 1:50)
-so.combined.cc <- FindClusters(so.combined.cc, resolution = 1)
-
-# Filter out low quality cluster, and lower transcript cells
-so.subset <- subset(so.combined.cc, nCount_RNA > 10000 & seurat_clusters %in% c(0,1,2,3,4,5,6,8,9))
-
-so.subset <- RunUMAP(so.subset, reduction = "pca", dims = 1:50)
-so.subset <- FindNeighbors(so.subset, reduction = "pca", dims = 1:50)
-so.subset <- FindClusters(so.subset, resolution = 1)
+so.final <- CellCycleScoring(so.final, s.features = s.genes, g2m.features = g2m.genes, set.ident = TRUE)
 
 # Annotate cells
-so.subset$cell_type <- so.subset$RNA_snn_res.1
-so.subset$cell_type <- recode(so.subset$cell_type,
-                                      "0" = "Dorsal forebrain progenitors",
-                                     "1" = "Dorsal forebrain progenitors",
-                                     "2" = "Ventral tuberal hypothalamic progenitors",
-                                     "3" = "Dorsal forebrain progenitors",
-                                     "4" = "Floor plate",
-                                     "5" = "Floor plate",
-                                     "6" = "Unknown",
-                                     "7" = "Dorsal forebrain progenitors")
+so.final$base_annotation <- so.final$RNA_snn_res.1.5
+so.final$base_annotation <- recode(so.final$base_annotation,
+                                        "0" = "Ventral tuberal hypothalamic progenitors",
+                                        "1" = "Dorsal forebrain progenitors",
+                                        "2" = "Dorsal forebrain progenitors",
+                                        "3" = "Ventral tuberal hypothalamic progenitors",
+                                        "4" = "Dorsal forebrain progenitors",
+                                        "5" = "Ventral tuberal hypothalamic progenitors",
+                                        "6" = "Dorsal forebrain progenitors",
+                                        "7" = "Dorsal forebrain progenitors",
+                                        "8" = "Dorsal forebrain progenitors",
+                                        "9" = "Dorsal forebrain progenitors",
+                                        "10" = "Dorsal forebrain progenitors",
+                                        "11" = "Dorsal forebrain progenitors",
+                                        "12" = "Dorsal forebrain progenitors",
+                                        "13" = "Dorsal forebrain progenitors",
+                                        "14" = "Ventral tuberal hypothalamic progenitors",
+                                        "15" = "Dorsal forebrain progenitors",
+                                        "16" = "Dorsal forebrain progenitors",
+                                        "17" = "Floor plate",
+                                        "18" = "Dorsal forebrain progenitors",
+                                        "19" = "Dorsal forebrain progenitors",
+                                        "20" = "Dorsal forebrain progenitors")
 
-# Calculate DEGs for Floor plate cells
-Idents(so.subset) <- so.subset$orig.ident
-Floor_plate_DEGs <- FindMarkers(subset(so.subset, cell_type == 'Floor plate'), ident.1 = 'SAMPLE 1', ident.2 = 'SAMPLE 3')
+so.final$final_annotation <- so.final$base_annotation
+so.final$final_annotation[so.final$floor_plate_score1 > 0.25] <- "Floor plate"
+so.final$final_annotation <- factor(so.final$final_annotation, 
+                                      levels = c("Floor plate", levels(so.final$final_annotation)[levels(so.final$final_annotation) != "Floor plate"]))
 
-# Calculate DEGs for G1 Floor plate cells
-Floor_plate_DEGs_G1 <- FindMarkers(subset(so.subset, cell_type == 'Floor plate' & Phase == 'G1'), ident.1 = 'SAMPLE 1', ident.2 = 'SAMPLE 3')
+# Annotate cells based on NES and SOX2 expression levels
+nes_expression <- FetchData(so.final, vars = "NES")
+sox2_expression <- FetchData(so.final, vars = "SOX2")
+so.final$NES_SOX2_classification <- ifelse(nes_expression > 0.25 & sox2_expression > 0.25, "NES+ SOX2+",
+                                         ifelse(nes_expression > 0.25, "NES+",
+                                                ifelse(sox2_expression > 0.25, "SOX2+",
+                                                       "NES- SOX2-")))
 
-# Visualization and figure reproduction
-pdf("2024.08.16_QC_metrics.pdf", width = 6, height = 3)
-VlnPlot(so.subset, features = c('nCount_RNA','nFeature_RNA'), group.by = 'orig.ident')
+# Annotate cells based on FOXA2 and PAX6 levels
+foxa2_expression <- FetchData(so.final, vars = "FOXA2")
+pax6_expression <- FetchData(so.final, vars = "PAX6")
+so.final$FOXA2_PAX6_classification <- ifelse(foxa2_expression > 0.25 & pax6_expression > 0.25, "FOXA2+ PAX6+",
+                                         ifelse(foxa2_expression > 0.25, "FOXA2+",
+                                                ifelse(pax6_expression > 0.25, "PAX6+",
+                                                       "FOXA2- PAX6-")))
 
-pdf("2024.08.16_DimPlot_cell_phase.pdf", width = 8, height = 5)
-DimPlot(so.subset, group.by = 'Phase')
+### Visualizations
+pdf("2025.01.13_ViolinPlot_QC.pdf", width = 9, height = 3)
+VlnPlot(so.final, group.by = 'plotting_ident', features = c('nFeature_RNA')) + theme(axis.text.x = element_blank())
+VlnPlot(so.final, group.by = 'plotting_ident', features = c('nCount_RNA')) + theme(axis.text.x = element_blank())
 
-pdf("2024.08.16_DimPlot_cell_type.pdf", width = 8, height = 5)
-DimPlot(so.subset, group.by = 'cell_type', cols = c('goldenrod2','orchid','darkturquoise','gray'))
+pdf("2025.01.13_DimPlots_CH_final.pdf", height = 4, width = 4)
+DimPlot(so.final, group.by = 'RNA_snn_res.1.5') +
+   theme(panel.border = element_rect(colour= 'black', fill = NA, size = 1))
+DimPlot(so.final, group.by = 'Phase') +
+   theme(panel.border = element_rect(colour= 'black', fill = NA, size = 1))
+DimPlot(so.final, group.by = 'plotting_ident',
+        cols = c('orange2','orange3','orange4','royalblue2','royalblue3','royalblue4','springgreen1','springgreen2','springgreen3')) +
+   theme(panel.border = element_rect(colour= 'black', fill = NA, size = 1))
+DimPlot(so.final, group.by = 'sample_type', cols = c('orange','royalblue','springgreen3')) +
+   theme(panel.border = element_rect(colour= 'black', fill = NA, size = 1))
+DimPlot(so.final, group.by = 'final_annotation', cols = c('darkturquoise','orchid','goldenrod2')) +
+   theme(panel.border = element_rect(colour= 'black', fill = NA, size = 1))
 
-pdf("2024.08.16_DimPlot_cell_type_split.pdf", width = 15, height = 5)
-DimPlot(so.subset, group.by = 'cell_type', cols = c('goldenrod2','orchid','darkturquoise','gray'), split.by = 'orig.ident')
 
-pdf("2024.08.16_DimPlot_cell_type_split_and_markers.pdf", width = 10, height = 12)
-FeaturePlot(so.subset, features = c('PAX6','SOX2','NES','FOXA2','GATA4'), split.by = 'orig.ident', order = T)
-FeaturePlot(so.subset, features = c('CD34','NKX2-1','NKX2-2','NKX6-1','OLIG2'), split.by = 'orig.ident', order = T)
-FeaturePlot(so.subset, features = c('DBX2','PAX6','IRX3','DBX1','PAX7'), split.by = 'orig.ident', order = T)
-FeaturePlot(so.subset, features = c('FOXA2','GLI1','GLI2','PTCH1','SMO'), split.by = 'orig.ident', order = T)
+pdf("2025.01.13_split_DimPlots_CH_final.pdf", height = 9, width = 9)
+DimPlot(so.final, group.by = 'final_annotation', cols = c('darkturquoise','orchid','goldenrod2'), split.by = 'plotting_ident', ncol = 3) +
+   theme(panel.border = element_rect(colour= 'black', fill = NA, size = 1))
+DimPlot(so.final, group.by = 'Phase', split.by = 'plotting_ident', ncol = 3) +
+   theme(panel.border = element_rect(colour= 'black', fill = NA, size = 1))
 
-pdf("2024.08.16_DotPlot_major_markers.pdf", width = 8, height = 4)
-DotPlot(so.subset, features = c('PAX6','OTX2','EMX2','NKX2-1','RAX','SIX6','FOXA2','ARX'), group.by = 'cell_type') + theme(axis.text.x = element_text(angle = 90))
+pdf("2025.01.13_proportions_PlottingIdent.pdf", width = 4, height = 6)
+metadata <- so.final@meta.data
 
-pdf("2024.08.27_DimPlots.pdf", width = 4, height = 4.3)
-DimPlot(subset(so, orig.ident == 'SAMPLE 1'), group.by = 'cell_type', cols = c('goldenrod2','orchid','darkturquoise','gray')) + ggtitle('SAMPLE 1') + NoLegend() + xlim(c(-6,6)) + ylim(c(-6,6)) + theme(panel.border = element_rect(colour = "black", fill = NA, size = 1))
-DimPlot(subset(so, orig.ident == 'SAMPLE 2'), group.by = 'cell_type', cols = c('goldenrod2','orchid','gray')) + ggtitle('SAMPLE 2') + NoLegend() + xlim(c(-6,6)) + ylim(c(-6,6)) + theme(panel.border = element_rect(colour = "black", fill = NA, size = 1))
-DimPlot(subset(so, orig.ident == 'SAMPLE 3'), group.by = 'cell_type', cols = c('goldenrod2','orchid','darkturquoise','gray')) + ggtitle('SAMPLE 3') + NoLegend() + xlim(c(-6,6)) + ylim(c(-6,6)) + theme(panel.border = element_rect(colour = "black", fill = NA, size = 1))
+proportions <- metadata %>%
+  group_by(plotting_ident, FOXA2_PAX6_classification) %>%
+  tally() %>%
+  ungroup()
+proportions <- proportions %>%
+  group_by(plotting_ident) %>%
+  mutate(proportion = n / sum(n)) %>%
+  ungroup()
+proportions_summary <- proportions %>%
+  group_by(sample_type, FOXA2_PAX6_classification) %>%
+  summarize(
+    mean_proportion = mean(proportion), 
+    sd_proportion = sd(proportion)
+  ) %>%
+  ungroup()
+ggplot(proportions, aes(x = plotting_ident, y = proportion, fill = FOXA2_PAX6_classification)) +
+  geom_bar(stat = "identity", position = "stack", color = 'black') +  # Stacked bar plot
+  labs(x = "Sample", y = "Proportion", fill = "FOXA2_PAX6_classification") +
+    scale_fill_manual(values = c("FOXA2- PAX6-" = 'white',
+                               "FOXA2+" = 'gray75',
+                               "FOXA2+ PAX6+" = 'gray50',
+                               "PAX6+" = "gray25")) +
+  theme_prism() +
+  theme(axis.text.x = element_text(angle = 90)) 
+ggplot(proportions_summary, aes(x = sample_type, y = mean_proportion, fill = FOXA2_PAX6_classification)) +
+  geom_bar(stat = "identity", position = "stack", color = 'black') +  # Stacked bar plot
+  labs(x = "Sample Type", y = "Average Proportion", fill = "FOXA2_PAX6_classification") +
+  scale_fill_manual(values = c("FOXA2- PAX6-" = 'white',
+                               "FOXA2+" = 'gray75',
+                               "FOXA2+ PAX6+" = 'gray50',
+                               "PAX6+" = "gray25")) +
+  theme_prism() +
+  theme(axis.text.x = element_text(angle = 90))  
 
-DimPlot(subset(so, orig.ident == 'SAMPLE 1'), group.by = 'Phase') + ggtitle('SAMPLE 1') + NoLegend() + xlim(c(-6,6)) + ylim(c(-6,6)) + theme(panel.border = element_rect(colour = "black", fill = NA, size = 1))
-DimPlot(subset(so, orig.ident == 'SAMPLE 2'), group.by = 'Phase') + ggtitle('SAMPLE 2') + NoLegend() + xlim(c(-6,6)) + ylim(c(-6,6)) + theme(panel.border = element_rect(colour = "black", fill = NA, size = 1))
-DimPlot(subset(so, orig.ident == 'SAMPLE 3'), group.by = 'Phase') + ggtitle('SAMPLE 3') + NoLegend() + xlim(c(-6,6)) + ylim(c(-6,6)) + theme(panel.border = element_rect(colour = "black", fill = NA, size = 1))
+proportions <- metadata %>%
+  group_by(plotting_ident, NES_SOX2_classification) %>%
+  tally() %>%
+  ungroup()
+proportions <- proportions %>%
+  group_by(plotting_ident) %>%
+  mutate(proportion = n / sum(n)) %>%
+  ungroup()
+proportions_summary <- proportions %>%
+  group_by(sample_type, NES_SOX2_classification) %>%
+  summarize(
+    mean_proportion = mean(proportion), 
+    sd_proportion = sd(proportion)
+  ) %>%
+  ungroup()
+ggplot(proportions, aes(x = plotting_ident, y = proportion, fill = NES_SOX2_classification)) +
+  geom_bar(stat = "identity", position = "stack", color = 'black') +  # Stacked bar plot
+  labs(x = "Sample", y = "Proportion", fill = "NES_SOX2_classication") +
+  scale_fill_manual(values = c("NES- SOX2-" = 'white',
+                               "NES+" = 'gray75',
+                               "NES+ SOX2+" = 'gray50',
+                               "SOX2+" = "gray25")) +
+  theme_prism() +
+  theme(axis.text.x = element_text(angle = 90)) # Rotate x-axis labels for readability 
+ggplot(proportions_summary, aes(x = sample_type, y = mean_proportion, fill = NES_SOX2_classification)) +
+  geom_bar(stat = "identity", position = "stack", color = 'black') +  # Stacked bar plot
+  labs(x = "Sample Type", y = "Average Proportion", fill = "NES_SOX2_classification") +
+  scale_fill_manual(values = c("NES- SOX2-" = 'white',
+                               "NES+" = 'gray75',
+                               "NES+ SOX2+" = 'gray50',
+                               "SOX2+" = "gray25")) +
+  theme_prism() +
+  theme(axis.text.x = element_text(angle = 90)) 
 
-pdf("2024.08.27_PooledDimPlots_cell_type.pdf", width = 6, height = 3)
-DimPlot(so, group.by = 'cell_type', cols = c('goldenrod2','orchid','darkturquoise','gray')) + ggtitle('ALL SAMPLES') +  xlim(c(-6,6)) + ylim(c(-6,6)) + theme(panel.border = element_rect(colour = "black", fill = NA, size = 1))
+proportions <- metadata %>%
+  group_by(plotting_ident, final_annotation) %>%
+  tally() %>%
+  ungroup()
+proportions <- proportions %>%
+  group_by(plotting_ident) %>%
+  mutate(proportion = n / sum(n)) %>%
+  ungroup()
+proportions_summary <- proportions %>%
+  group_by(sample_type, final_annotation) %>%
+  summarize(
+    mean_proportion = mean(proportion), 
+    sd_proportion = sd(proportion)
+  ) %>%
+  ungroup()
+ggplot(proportions, aes(x = plotting_ident, y = proportion, fill = final_annotation)) +
+  geom_bar(stat = "identity", position = "stack", color = 'black') +  # Stacked bar plot
+  labs(x = "Sample", y = "Proportion", fill = "final_annotation") +
+  scale_fill_manual(values = c("Floor plate" = 'darkturquoise',
+                               "Dorsal forebrain progenitors" = 'goldenrod2',
+                               "Ventral tuberal hypothalamic progenitors" = 'orchid')) +
+  theme_prism() +
+  theme(axis.text.x = element_text(angle = 90))
+ggplot(proportions_summary, aes(x = sample_type, y = mean_proportion, fill = final_annotation)) +
+  geom_bar(stat = "identity", position = "stack", color = 'black') +  # Stacked bar plot
+  labs(x = "Sample Type", y = "Average Proportion", fill = "final_annotation") +
+  scale_fill_manual(values = c("Floor plate" = 'darkturquoise',
+                               "Dorsal forebrain progenitors" = 'goldenrod2',
+                               "Ventral tuberal hypothalamic progenitors" = 'orchid')) +
+  theme_prism() +
+  theme(axis.text.x = element_text(angle = 90))  
 
-pdf("2024.08.27_PooledDimPlots_phase.pdf")
-DimPlot(so, group.by = 'Phase') + ggtitle('ALL SAMPLES') +  xlim(c(-6,6)) + ylim(c(-6,6)) + theme(panel.border = element_rect(colour = "black", fill = NA, size = 1))
+pdf("2025.01.13_Heatmap_marker_genes.pdf", width = 5, height = 5)
+genes_of_interest <- c('PAX6', 'OTX2', 'EMX2', 'NKX2-1', 'RAX', 'SIX6', 'FOXA2', 'ARX')
+## FLOOR PLATE
+so.final.subset <- subset(so.final, sample_type == 'SynNotch H9s + WT H9s', invert = TRUE)
+so.final.subset <- subset(so.final.subset, final_annotation == 'Floor plate')
+aggregated_expr <- AverageExpression(so.final.subset, 
+                                       features = genes_of_interest, 
+                                       group.by = "plotting_ident", 
+                                       verbose = TRUE)
+expr_data_matrix <- aggregated_expr$RNA
+expr_data_matrix <- expr_data_matrix[genes_of_interest, , drop = FALSE]
+pheatmap(expr_data_matrix, 
+         scale = "none",  # Normalize across rows (genes)
+         cluster_cols = FALSE,
+         cluster_rows = FALSE,
+         cellwidth = 20,
+         cellheight = 20,
+         border_color = 'black',
+         clustering_method = "complete",  # Clustering method
+         show_rownames = TRUE,  # Show gene names
+         show_colnames = TRUE,  # Show plotting_ident names
+         main = 'Floor plate',
+         color = viridis::viridis(100))  # Color scale (viridis)
 
-# Print out cell numbers
-table(so.subset$orig.ident, so.subset$cell_type)
+## VENTRAL TUBERAL HYPOTHALAMIC PROGENITORS
+so.final.subset <- subset(so.final, sample_type == 'SynNotch H9s + WT H9s', invert = TRUE)
+so.final.subset <- subset(so.final.subset, final_annotation == 'Ventral tuberal hypothalamic progenitors')
+aggregated_expr <- AverageExpression(so.final.subset, 
+                                       features = genes_of_interest, 
+                                       group.by = "plotting_ident", 
+                                       verbose = TRUE)
+expr_data_matrix <- aggregated_expr$RNA
+expr_data_matrix <- expr_data_matrix[genes_of_interest, , drop = FALSE]
+pheatmap(expr_data_matrix, 
+         scale = "none",  # Normalize across rows (genes)
+         cluster_cols = FALSE,
+         cluster_rows = FALSE,
+         cellwidth = 20,
+         cellheight = 20,
+         border_color = 'black',
+         clustering_method = "complete",  # Clustering method
+         show_rownames = TRUE,  # Show gene names
+         show_colnames = TRUE,  # Show plotting_ident names
+         main = 'Ventral tuberal hypothalamic progenitors',
+         color = viridis::viridis(100))  # Color scale (viridis)
 
-# Save seurat object
-saveRDS(so.subset, "2024.08.16_CH_so.RDS")
 
-### GO ANALYSIS
-# Prepare data 
-converted.symbols <- AnnotationDbi::select(org.Hs.eg.db, 
-       keys = rownames(Floor_plate_DEGs),
-       columns = c("ENTREZID", "SYMBOL"),
-       keytype = "SYMBOL")
-converted.symbols <- subset(converted.symbols, !(duplicated(converted.symbols$SYMBOL)))
-Floor_plate_DEGs$IDs <- converted.symbols$ENTREZID
-geneList <- Floor_plate_DEGs$avg_log2FC
-names(geneList) <- Floor_plate_DEGs$IDs
-geneList <- sort(geneList, decreasing = T)
+## DORSAL FOREBRAIN PROGENITORS
+so.final.subset <- subset(so.final, sample_type == 'WT H9s WITH SHH', invert = TRUE)
+so.final.subset <- subset(so.final.subset, final_annotation == 'Dorsal forebrain progenitors')
+aggregated_expr <- AverageExpression(so.final.subset, 
+                                       features = genes_of_interest, 
+                                       group.by = "plotting_ident", 
+                                       verbose = TRUE)
+expr_data_matrix <- aggregated_expr$RNA
+expr_data_matrix <- expr_data_matrix[genes_of_interest, , drop = FALSE]
+pheatmap(expr_data_matrix, 
+         scale = "none",  # Normalize across rows (genes)
+         cluster_cols = FALSE,
+         cluster_rows = FALSE,
+         cellwidth = 20,
+         cellheight = 20,
+         border_color = 'black',
+         clustering_method = "complete",  # Clustering method
+         show_rownames = TRUE,  # Show gene names
+         show_colnames = TRUE,  # Show plotting_ident names
+         main = 'Dorsal forebrain progenitors',
+         color = viridis::viridis(100))  # Color scale (viridis)
 
-# Run gene ontology analysis and visualize
-GOresults <- gseGO(geneList     = geneList,
-              OrgDb        = org.Hs.eg.db,
-              ont          = "BP",
-              minGSSize    = 100,
-              maxGSSize    = 500,
-              pvalueCutoff = 0.05,
-              verbose      = FALSE)
-
-pdf("2024.08.16_BP_enrichment.pdf")
-dotplot(GOresults, showCategory = 10, title = "Enriched Pathways" , split=".sign") + facet_grid(.~.sign)
-
-### VOX HUNT ANALYSIS
-# Read in BrainSpan Data using the VoxHunt library
+#### Run VoxHunt analysis
 data('brainspan')
 names(brainspan)
-
+load_aba_data("/voxhunt_rds")
 regional_markers <- structure_markers('E13') %>%
     group_by(group) %>%
     top_n(10, auc) %>% 
     {unique(.$gene)}
-
-# Map Floor Plate cells to BrainSpan Atlas
 ref_map <- brainspan_map(
-    subset(so.subset, cell_type == 'Floor plate'),
+    subset(subset(so.final, final_annotation == 'Floor plate'), plotting_ident %in% c('WT H9s WITH SHH 3','WT H9s WITH SHH 2','WT H9s WITH SHH 1','SynNotch H9s + GFP Ligand 1','SynNotch H9s + GFP Ligand 2')),
     stages = 10:24,
-    group_name = 'orig.ident',
+    group_name = 'plotting_ident',
     genes_use = regional_markers,
     pseudobulk_groups = T
 )
 
-pdf("2024.08.16_BrainSpan_floor_plate_correlation.pdf", width = 9, height = 4)
-plot_map(ref_map)
+pdf("2025.01.13_floor_plate_BrainSpan_mapping.pdf", width = 10, height = 8)
+plot_map(ref_map, scale = F)
 
-pdf("2024.08.16_BrainSpan_floor_plate_correlation2.pdf", width = 3, height = 5)
+pdf("2025.01.13_floor_plate_BrainSpan_mapping_area.pdf", width = 8, height = 6)
 plot_structure_similarity(ref_map, annotation_level = 'structure_name', scale = F)
 
-# Map bulk cells to BrainSpan Atlas
-ref_map_bulk <- brainspan_map(
-    so.subset,
-    stages = 10:24,
-    group_name = 'orig.ident',
-    genes_use = regional_markers,
-    pseudobulk_groups = T
-)
+#### Pseudobulk cells and conduct DEG analysis
+so.final.bulk <- AggregateExpression(so.final, group.by = c('plotting_ident','final_annotation'), return.seurat = T)
 
-pdf("2024.08.16_BrainSpan_bulk_cells_correlation.pdf", width = 9, height = 4)
-plot_map(ref_map_bulk)
+# Annotate cells
+so.final.bulk$sample_type <- so.final.bulk$plotting_ident
+so.final.bulk$sample_type <- recode(so.final.bulk$sample_type,
+                                    "WT H9s WITH SHH 1" = "WT H9s WITH SHH",
+                                    "WT H9s WITH SHH 2" = "WT H9s WITH SHH",
+                                    "SynNotch H9s + WT H9s 1" = "SynNotch H9s + WT H9s",
+                                  "SynNotch H9s + WT H9s 2" = "SynNotch H9s + WT H9s",
+                                  "SynNotch H9s + GFP Ligand 1" = "SynNotch H9s + GFP Ligand",
+                                  "SynNotch H9s + GFP Ligand 2" = "SynNotch H9s + GFP Ligand",
+                                  "WT H9s WITH SHH 3" = "WT H9s WITH SHH",
+                                  "SynNotch H9s + GFP Ligand 3" = "SynNotch H9s + GFP Ligand",
+                                  "SynNotch H9s + WT H9s 3" = "SynNotch H9s + WT H9s")
 
-pdf("2024.08.16_BrainSpan_bulk_cells_correlation2.pdf", width = 3, height = 5)
-plot_structure_similarity(ref_map_bulk, annotation_level = 'structure_name', scale = F)
+
+Idents(so.final.bulk) <- so.final.bulk$sample_type
+# Calculate DEGs for Floor plate cells
+Floor_plate_DEGs_bulk <- FindMarkers(subset(so.final.bulk, final_annotation == 'Floor plate'), ident.1 = 'SynNotch H9s + GFP Ligand', ident.2 = 'WT H9s WITH SHH', test.use = 'DESeq2')
+
+# Calculate DEGs for Dorsal forebrain progenitors
+Dorsal_forebrains_DEGs_bulk <- FindMarkers(subset(so.final.bulk, final_annotation == 'Dorsal forebrain progenitors'), ident.1 = 'SynNotch H9s + GFP Ligand', ident.2 = 'SynNotch H9s + WT H9s', test.use = 'DESeq2')
+
+# Calculate DEGs for Ventral tuberal hypothalamic progenitors
+Ventral_progenitors_DEGs_bulk <- FindMarkers(subset(so.final.bulk, final_annotation == 'Ventral tuberal hypothalamic progenitors'), ident.1 = 'SynNotch H9s + GFP Ligand', ident.2 = 'WT H9s WITH SHH', test.use = 'DESeq2')
+
+pdf("2025.01.13_VolcanoPlot_DEGs_floor_plate.pdf", height = 7, width = 7)
+EnhancedVolcano(Floor_plate_DEGs_bulk, lab = rownames(Floor_plate_DEGs_bulk), 
+                x = 'avg_log2FC', 
+                y = 'p_val_adj',
+                title = 'Differentially expressed genes', 
+                subtitle = 'Floor plate cells',
+                FCcutoff = 0.25,
+                pCutoff = 0.05,
+                drawConnectors = T,
+                lengthConnectors = unit(1, "npc"),
+                arrowheads = F)
+
+pdf("2025.01.13_Heatmap_DEGs.pdf", width = 5, height = 5)
+genes_of_interest <- rownames(subset(Floor_plate_DEGs_bulk, p_val_adj < 0.05))
+so.final.subset <- subset(so.final, sample_type == 'SynNotch H9s + WT H9s', invert = TRUE)
+so.final.subset <- subset(so.final.subset, final_annotation == 'Floor plate')
+aggregated_expr <- AverageExpression(so.final.subset, 
+                                       features = genes_of_interest, 
+                                       group.by = "plotting_ident", 
+                                       verbose = TRUE)
+expr_data_matrix <- aggregated_expr$RNA
+expr_data_matrix <- expr_data_matrix[genes_of_interest, , drop = FALSE]
+pheatmap(expr_data_matrix, 
+         scale = "none",  # Normalize across rows (genes)
+         cluster_cols = FALSE,
+         cluster_rows = TRUE,
+         cellwidth = 20,
+         cellheight = 20,
+         border_color = 'black',
+         clustering_method = "complete",  # Clustering method
+         show_rownames = TRUE,  # Show gene names
+         show_colnames = TRUE,  # Show plotting_ident names
+         main = 'Floor plate',
+         color = viridis::viridis(100))  # Color scale (viridis)
+
+write.csv(Floor_plate_DEGs_bulk, "2025.01.13_Floor_plate_DEGs.csv")
+
+#### FLOOR PLATE COMPARISON
+# Read in human floor plate data
+human_floor_plate <- readRDS("GSE157329_floor_plate_populations_seurat_object.RDS")
+
+human_floor_plate.bulk <- AggregateExpression(human_floor_plate, group.by = 'final_annotation', return.seurat = T)
+
+# Harmonize and combine the data and compute the Pearson correlation
+genes_seurat1 <- rownames(so.final.bulk)
+genes_seurat2 <- rownames(human_floor_plate.bulk)
+
+common_genes <- intersect(genes_seurat1, genes_seurat2)
+
+seurat_obj1_common <- so.final.bulk[common_genes, ]
+seurat_obj2_common <- human_floor_plate.bulk[common_genes, ]
+
+seurat_obj1_common <- subset(seurat_obj1_common, final_annotation == 'Floor plate' & sample_type %in% c('WT H9s WITH SHH','SynNotch H9s + GFP Ligand'))
+
+expr_seurat1 <- t(as.matrix(FetchData(seurat_obj1_common, vars = common_genes)))
+expr_seurat2 <- t(as.matrix(FetchData(seurat_obj2_common, vars = common_genes)))
+
+expr_seurat1 <- expr_seurat1[common_genes, ]
+expr_seurat2 <- expr_seurat2[common_genes, ]
+
+correlation_matrix <- matrix(NA, nrow = ncol(expr_seurat1), ncol = ncol(expr_seurat2))
+rownames(correlation_matrix) <- colnames(expr_seurat1)  # Cells from seurat_obj1_common
+colnames(correlation_matrix) <- colnames(expr_seurat2)  # Cells from seurat_obj2_common
+
+for (i in 1:ncol(expr_seurat1)) {
+  for (j in 1:ncol(expr_seurat2)) {
+    cell1_expr <- expr_seurat1[, i]
+    cell2_expr <- expr_seurat2[, j]
+    
+    correlation_matrix[i, j] <- cor(cell1_expr, cell2_expr, method = "pearson")
+  }
+write.csv(correlation_matrix, "2025.01.13_correlation_to_fp_phenotype.csv")
+
+# Combine datasets and run principal component analysis
+seurat_obj2_common$sample_type <- 'human floor plate'
+seurat_obj_bulked <- merge(seurat_obj1_common,seurat_obj2_common)
+seurat_obj_bulked <- NormalizeData(seurat_obj_bulked)
+seurat_obj_bulked <- FindVariableFeatures(seurat_obj_bulked, selection.method = "vst", nfeatures = 2000)
+seurat_obj_bulked <- ScaleData(seurat_obj_bulked, verbose = FALSE)
+seurat_obj_bulked <- RunPCA(seurat_obj_bulked, npcs = 4, verbose = TRUE)
+}
+
+scCalcPCAVarExplained <- function(obj = combined.obj) { # Determine percent of variation associated with each PC.
+  pct <- obj@reductions$pca@stdev / sum(obj@reductions$pca@stdev) * 100
+  names(pct) <- 1:length(obj@reductions$pca@stdev)
+  return(pct)
+}
+
+scCalcPCAVarExplained(seurat_obj_bulked) # Read out how much each principal component's loading is
+
+pca_data <- as.data.frame(seurat_obj_bulked[["pca"]]@cell.embeddings)
+pca_data$sample_type <- seurat_obj_bulked$sample_type
+pca_data$orig_ident <- seurat_obj_bulked$orig.ident
+
+custom_colors <- c("floor plate" = "brown1",
+                   "floor plate.rhombomere-1" = "brown2",
+                   "floor plate.rhombomere-2" = "brown3",
+                   "SynNotch H9s + GFP Ligand 1_Floor plate" = "orange2",
+                   "SynNotch H9s + GFP Ligand 2_Floor plate" = "orange3",
+                   "SynNotch H9s + GFP Ligand 3_Floor plate" = "orange4",
+                   "WT H9s WITH SHH 1_Floor plate" = "springgreen1",
+                   "WT H9s WITH SHH 2_Floor plate" = "springgreen2",
+                   "WT H9s WITH SHH 3_Floor plate" = "springgreen3")
+
+pca_plot <- ggplot(pca_data, aes(x = PC_1, y = PC_2, color = orig_ident)) +
+  geom_point(size = 3) + 
+  scale_color_manual(values = custom_colors) +
+  xlim(c(-60,60)) +
+  ylim(c(-60,60)) +
+  theme_minimal()
+
+ellipse_colors <- c("human floor plate" = "brown1",
+                    "SynNotch H9s + GFP Ligand" = "orange2",
+                    "WT H9s WITH SHH" = "springgreen1")
+  
+pca_plot_with_ellipses <- pca_plot + 
+  geom_mark_ellipse(data = pca_data %>%
+                      group_by(sample_type) %>%
+                      filter(n() >= 3),   # Ensure at least 3 points per sample_type
+                    aes(x = PC_1, y = PC_2, fill = sample_type),
+                    color = "black", 
+                    size = 0.5, 
+                    alpha = 0.2) + 
+  scale_fill_manual(values = ellipse_colors) +
+  xlab('PC1 (32.4% variance)') + # loadings based on previous computation
+  ylab('PC2 (27.8%variance)') +
+  theme_prism()
+
+pdf("2025.01.13_PCA_plot.pdf", width = 8, height = 4)
+print(pca_plot_with_ellipses)
+
+### SAVE DATA
+saveRDS(so.final, "2025.01.13_CH_synNotch_seurat_object.RDS")
