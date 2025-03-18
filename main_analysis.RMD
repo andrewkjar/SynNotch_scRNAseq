@@ -429,6 +429,7 @@ EnhancedVolcano(Floor_plate_DEGs_bulk, lab = rownames(Floor_plate_DEGs_bulk),
                 subtitle = 'Floor plate cells',
                 FCcutoff = 0.25,
                 pCutoff = 0.05,
+                col = c('black','purple4','blue','blue'),
                 drawConnectors = T,
                 lengthConnectors = unit(1, "npc"),
                 arrowheads = F)
