@@ -190,12 +190,12 @@ DimPlot(so.final, group.by = 'plotting_ident',
    theme(panel.border = element_rect(colour= 'black', fill = NA, size = 1))
 DimPlot(so.final, group.by = 'sample_type', cols = c('orange','royalblue','springgreen3')) +
    theme(panel.border = element_rect(colour= 'black', fill = NA, size = 1))
-DimPlot(so.final, group.by = 'final_annotation', cols = c('darkturquoise','orchid','goldenrod2')) +
+DimPlot(so.final, group.by = 'final_annotation', cols = c('orchid','darkturquoise','red4')) +
    theme(panel.border = element_rect(colour= 'black', fill = NA, size = 1))
 
 
 pdf("2025.01.13_split_DimPlots_CH_final.pdf", height = 9, width = 9)
-DimPlot(so.final, group.by = 'final_annotation', cols = c('darkturquoise','orchid','goldenrod2'), split.by = 'plotting_ident', ncol = 3) +
+DimPlot(so.final, group.by = 'final_annotation', cols = c('orchid','darkturquoise','red4'), split.by = 'plotting_ident', ncol = 3) +
    theme(panel.border = element_rect(colour= 'black', fill = NA, size = 1))
 DimPlot(so.final, group.by = 'Phase', split.by = 'plotting_ident', ncol = 3) +
    theme(panel.border = element_rect(colour= 'black', fill = NA, size = 1))
